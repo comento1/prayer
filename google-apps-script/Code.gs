@@ -56,9 +56,13 @@ function handleAuth(payload) {
   const sheet = getOrCreateUserSheet();
   const lastRow = sheet.getLastRow();
   const data = lastRow >= 1 ? sheet.getRange(2, 1, lastRow, 3).getValues() : [];
+  var nickNorm = String(nickname).trim();
+  var pinStr = String(pin);
   for (var i = 0; i < data.length; i++) {
-    if (data[i][0] === nickname) {
-      if (data[i][1] === pin) {
+    var rowNick = String(data[i][0] || '').trim();
+    var rowPin = String(data[i][1] ?? '');
+    if (rowNick === nickNorm) {
+      if (rowPin === pinStr) {
         var id = i + 2;
         return { success: true, user: { id: id, nickname: nickname } };
       }
