@@ -1,0 +1,45 @@
+@import url("https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&family=Noto+Serif+KR:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Pretendard", ui-sans-serif, system-ui, sans-serif;
+  --font-serif:
+    "Noto Serif KR", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+
+  --color-primary-light: #2d3a8c;
+  --color-primary-dark: #7b8fd4;
+
+  --color-secondary-light: #c9973a;
+  --color-secondary-dark: #d4a84b;
+
+  --color-bg-light: #faf8f4;
+  --color-bg-dark: #1a1f36;
+
+  --color-accent-light: #8da399; /* Sage Green */
+  --color-accent-dark: #a3b8ae;
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--color-bg-light)] text-slate-900 font-sans antialiased transition-colors duration-300;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body {
+      @apply bg-[var(--color-bg-dark)] text-slate-100;
+    }
+  }
+}
+
+/* Custom utilities */
+.glass-panel {
+  @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-white/20 dark:border-slate-700/50;
+}
+
+.prayer-card {
+  @apply bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 p-5 transition-all;
+}
+
+.font-prayer {
+  @apply font-serif tracking-wide;
+}
