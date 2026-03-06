@@ -3,6 +3,24 @@ import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { Group, User } from "../types";
 
+const FALLBACK_GROUPS: Group[] = [
+  { id: 1, name: "창환 조" },
+  { id: 2, name: "은아 조" },
+];
+
+const USER_GROUPS_KEY = (userId: number) => `user_groups_${userId}`;
+
+async function safeJson<T>(res: Response): Promise<T | null> {
+  const ct = res.headers.get("content-type") || "";
+  const text = await res.text();
+  if (!ct.includes("application/json")) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default function GroupSelect() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
@@ -16,14 +34,37 @@ export default function GroupSelect() {
     }
 
     fetch("/api/groups")
-      .then((res) => res.json())
-      .then(setGroups);
+      .then(async (res) => {
+        const data = await safeJson<Group[]>(res);
+        if (data && Array.isArray(data) && data.length > 0) setGroups(data);
+        else setGroups(FALLBACK_GROUPS);
+      })
+      .catch(() => setGroups(FALLBACK_GROUPS));
 
     fetch(`/api/users/${user.id}/groups`)
-      .then((res) => res.json())
-      .then((userGroups: Group[]) =>
-        setSelectedGroups(userGroups.map((g) => g.id)),
-      );
+      .then(async (res) => {
+        const data = await safeJson<Group[]>(res);
+        if (data && Array.isArray(data)) {
+          setSelectedGroups(data.map((g) => g.id));
+          return;
+        }
+        const stored = localStorage.getItem(USER_GROUPS_KEY(user.id));
+        if (stored) {
+          try {
+            const ids = JSON.parse(stored) as number[];
+            if (Array.isArray(ids)) setSelectedGroups(ids);
+          } catch (_) {}
+        }
+      })
+      .catch(() => {
+        const stored = localStorage.getItem(USER_GROUPS_KEY(user.id));
+        if (stored) {
+          try {
+            const ids = JSON.parse(stored) as number[];
+            if (Array.isArray(ids)) setSelectedGroups(ids);
+          } catch (_) {}
+        }
+      });
   }, [user?.id, navigate]);
 
   const toggleGroup = (id: number) => {
@@ -33,13 +74,16 @@ export default function GroupSelect() {
   };
 
   const handleComplete = async () => {
-    if (selectedGroups.length === 0) return;
+    if (selectedGroups.length === 0 || !user) return;
 
-    await fetch(`/api/users/${user?.id}/groups`, {
+    const res = await fetch(`/api/users/${user.id}/groups`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ groupIds: selectedGroups }),
     });
+    if (!res.ok) {
+      localStorage.setItem(USER_GROUPS_KEY(user.id), JSON.stringify(selectedGroups));
+    }
 
     navigate("/feed");
   };
