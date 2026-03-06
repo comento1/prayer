@@ -9,13 +9,8 @@ export default function Onboarding() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // 배포(Vercel 등)에서는 API 서버가 없으므로 구글 시트 웹훅으로 로그인. 환경 변수 없으면 기본 URL 사용.
-  const authUrl =
-    (import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL as string | undefined)?.trim() ||
-    (import.meta.env.PROD
-      ? "https://script.google.com/macros/s/AKfycbzJR0sMA-dpak-UJFUAiDDXL61vtD7bY5a8s6w_R3GDnl88tJ0ym_CxOFfQB6w2rQTS/exec"
-      : "");
-  const useSheetAuth = !!authUrl;
+  // 배포(Vercel)에서는 /api/sheet-auth 프록시 사용 (CORS 회피). 로컬에서는 Express /api/auth/login 사용.
+  const useSheetAuth = !!import.meta.env.PROD;
 
   const handleStart = async () => {
     if (!nickname.trim()) {
@@ -33,10 +28,10 @@ export default function Onboarding() {
 
     try {
       if (useSheetAuth) {
-        const res = await fetch(authUrl!, {
+        const res = await fetch("/api/sheet-auth", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "auth", nickname: nickname.trim(), pin }),
+          body: JSON.stringify({ nickname: nickname.trim(), pin }),
         });
         const text = await res.text();
         let data: { success?: boolean; user?: { id: number; nickname: string }; error?: string };
