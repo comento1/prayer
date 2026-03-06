@@ -22,7 +22,20 @@ export default function Onboarding() {
         body: JSON.stringify({ nickname, pin }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      const text = await res.text();
+      if (!contentType.includes("application/json")) {
+        console.warn("Login response was not JSON:", text.slice(0, 100));
+        setError("서버에 연결할 수 없습니다. API 서버가 실행 중인지 확인해주세요.");
+        return;
+      }
+      let data: { error?: string };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError("서버 응답을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
       if (!res.ok) throw new Error(data.error);
 
       localStorage.setItem("user", JSON.stringify(data));
