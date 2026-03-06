@@ -9,8 +9,13 @@ export default function Onboarding() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const authUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL as string | undefined;
-  const useSheetAuth = !!authUrl?.trim();
+  // 배포(Vercel 등)에서는 API 서버가 없으므로 구글 시트 웹훅으로 로그인. 환경 변수 없으면 기본 URL 사용.
+  const authUrl =
+    (import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL as string | undefined)?.trim() ||
+    (import.meta.env.PROD
+      ? "https://script.google.com/macros/s/AKfycbzJR0sMA-dpak-UJFUAiDDXL61vtD7bY5a8s6w_R3GDnl88tJ0ym_CxOFfQB6w2rQTS/exec"
+      : "");
+  const useSheetAuth = !!authUrl;
 
   const handleStart = async () => {
     if (!nickname.trim()) {
@@ -59,7 +64,9 @@ export default function Onboarding() {
       const contentType = res.headers.get("content-type") || "";
       const text = await res.text();
       if (!contentType.includes("application/json")) {
-        setError("서버에 연결할 수 없습니다. API 서버가 실행 중인지 확인해주세요.");
+        setError(
+          "로그인 API에 연결할 수 없습니다. 로컬에서는 터미널에서 npm run dev 로 서버를 실행한 뒤 다시 시도하세요."
+        );
         return;
       }
       let data: { error?: string };
