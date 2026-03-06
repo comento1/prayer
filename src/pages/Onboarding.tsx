@@ -9,23 +9,56 @@ export default function Onboarding() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  const authUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL as string | undefined;
+  const useSheetAuth = !!authUrl?.trim();
+
   const handleStart = async () => {
-    if (!nickname || pin.length !== 4) {
-      setError("닉네임과 4자리 PIN을 입력해주세요.");
+    if (!nickname.trim()) {
+      setError("닉네임을 입력해주세요.");
+      return;
+    }
+    if (!pin) {
+      setError(useSheetAuth ? "PIN을 입력해주세요." : "4자리 PIN을 입력해주세요.");
+      return;
+    }
+    if (!useSheetAuth && pin.length !== 4) {
+      setError("PIN은 4자리 숫자로 입력해주세요.");
       return;
     }
 
     try {
+      if (useSheetAuth) {
+        const res = await fetch(authUrl!, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "auth", nickname: nickname.trim(), pin }),
+        });
+        const text = await res.text();
+        let data: { success?: boolean; user?: { id: number; nickname: string }; error?: string };
+        try {
+          data = JSON.parse(text);
+        } catch {
+          setError("응답을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.");
+          return;
+        }
+        if (!data.success || !data.user) {
+          setError(data.error || "로그인에 실패했습니다.");
+          return;
+        }
+        localStorage.setItem("user", JSON.stringify(data.user));
+        navigate("/groups");
+        return;
+      }
+
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname, pin }),
+        body: JSON.stringify({ nickname: nickname.trim(), pin }),
       });
 
       const contentType = res.headers.get("content-type") || "";
       const text = await res.text();
       if (!contentType.includes("application/json")) {
-        console.warn("Login response was not JSON:", text.slice(0, 100));
         setError("서버에 연결할 수 없습니다. API 서버가 실행 중인지 확인해주세요.");
         return;
       }
@@ -80,15 +113,19 @@ export default function Onboarding() {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              PIN (4자리 숫자)
+              {useSheetAuth ? "PIN (원하는 번호)" : "PIN (4자리 숫자)"}
             </label>
             <input
               type="password"
-              maxLength={4}
+              maxLength={useSheetAuth ? 20 : 4}
               value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ""))}
+              onChange={(e) =>
+                setPin(
+                  useSheetAuth ? e.target.value : e.target.value.replace(/[^0-9]/g, "")
+                )
+              }
               className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-[var(--color-primary-light)] outline-none transition-all tracking-widest"
-              placeholder="••••"
+              placeholder={useSheetAuth ? "원하는 PIN 입력" : "••••"}
             />
           </div>
 

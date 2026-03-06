@@ -29,9 +29,16 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 export default function App() {
   useEffect(() => {
     fetch("/api/health")
-      .then((res) => res.json())
-      .then((data) => console.log("Server health:", data))
-      .catch((err) => console.error("Server health check failed:", err));
+      .then(async (res) => {
+        const contentType = res.headers.get("content-type") || "";
+        const text = await res.text();
+        if (!contentType.includes("application/json")) return;
+        try {
+          const data = JSON.parse(text);
+          console.log("Server health:", data);
+        } catch (_) {}
+      })
+      .catch(() => {});
   }, []);
 
   return (

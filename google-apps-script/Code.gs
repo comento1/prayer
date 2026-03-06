@@ -13,12 +13,17 @@
  */
 
 const SHEET_NAME = '중보기도_기록';
+const USERS_SHEET_NAME = '사용자';
 
 function doPost(e) {
   try {
     const payload = (e && e.postData && e.postData.contents)
       ? JSON.parse(e.postData.contents)
       : {};
+    if (payload.action === 'auth') {
+      const result = handleAuth(payload);
+      return createResponse(200, result);
+    }
     const row = toRow(payload);
     if (row && row.length && payload.action) {
       const sheet = getOrCreateSheet();
@@ -29,6 +34,41 @@ function doPost(e) {
     console.error(err);
     return createResponse(500, { error: String(err.message) });
   }
+}
+
+function getOrCreateUserSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(USERS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(USERS_SHEET_NAME);
+    sheet.appendRow(['닉네임', 'PIN', '생성일시']);
+    sheet.getRange('1:1').setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function handleAuth(payload) {
+  const nickname = String(payload.nickname || '').trim();
+  const pin = String(payload.pin || '').trim();
+  if (!nickname || !pin) {
+    return { success: false, error: '닉네임과 PIN을 입력해주세요.' };
+  }
+  const sheet = getOrCreateUserSheet();
+  const lastRow = sheet.getLastRow();
+  const data = lastRow >= 1 ? sheet.getRange(2, 1, lastRow, 3).getValues() : [];
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] === nickname) {
+      if (data[i][1] === pin) {
+        var id = i + 2;
+        return { success: true, user: { id: id, nickname: nickname } };
+      }
+      return { success: false, error: 'PIN이 일치하지 않습니다.' };
+    }
+  }
+  var created = new Date().toISOString();
+  sheet.appendRow([nickname, pin, created]);
+  var newId = sheet.getLastRow();
+  return { success: true, user: { id: newId, nickname: nickname }, isNew: true };
 }
 
 function doGet(e) {
