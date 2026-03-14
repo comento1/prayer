@@ -6,6 +6,7 @@ import fs from "fs";
 import db from "./src/db.ts";
 import { GoogleGenAI } from "@google/genai";
 
+// 기도 등록/수정/삭제 등 이벤트를 구글 시트에 기록. .env에 GOOGLE_SHEETS_WEBHOOK_URL 설정 필요.
 const GOOGLE_SHEETS_WEBHOOK_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL || "";
 
 function logToSheet(payload: Record<string, unknown>) {

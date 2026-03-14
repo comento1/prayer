@@ -21,9 +21,14 @@ export default function Feed() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!user?.id) {
+      setGroups([]);
+      return;
+    }
     fetch(`/api/users/${user.id}/groups`)
-      .then((res) => res.json())
-      .then(setGroups);
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setGroups(Array.isArray(data) ? data : []))
+      .catch(() => setGroups([]));
   }, [user.id]);
 
   useEffect(() => {

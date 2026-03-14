@@ -17,9 +17,14 @@ export default function Search() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch(`/api/users/${user.id}/groups`)
-      .then((res) => res.json())
-      .then(setGroups);
+    if (user?.id) {
+      fetch(`/api/users/${user.id}/groups`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setGroups(Array.isArray(data) ? data : []))
+        .catch(() => setGroups([]));
+    } else {
+      setGroups([]);
+    }
 
     // Fetch users in same groups (simplified for MVP: just fetch all users)
     // In a real app, this should be filtered by group
