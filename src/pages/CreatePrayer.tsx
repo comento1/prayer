@@ -48,7 +48,8 @@ export default function CreatePrayer() {
   "type": "refined",
   "text": "다듬어진 기도 제목 한 문장",
   "expandedPrayer": "작성한 내용을 2~3문장으로 풀어쓴 기도문 (친구에게 말하듯 청년답게)",
-  "bibleVerse": "연관된 성경 구절 한 개 (책 장:절 형식, 예: 빌립보 4:6-7). 없으면 빈 문자열."
+  "bibleVerseRef": "연관 성경 위치 (예: 빌립보 4:6-7). 없으면 빈 문자열.",
+  "bibleVerseQuote": "위 성경 구절의 실제 말씀 인용 1~2문장 (한글). 없으면 빈 문자열."
 }`,
         config: {
           responseMimeType: "application/json",
@@ -59,9 +60,14 @@ export default function CreatePrayer() {
       const data = typeof raw === "string" ? JSON.parse(raw) : raw;
       const text = data?.text ?? content;
       let finalText = text;
-      if (data?.expandedPrayer || data?.bibleVerse) {
-        const parts = [data.expandedPrayer, data.bibleVerse ? "📖 " + data.bibleVerse : ""].filter(Boolean);
-        if (parts.length) finalText = text + "\n\n" + parts.join("\n\n");
+      if (data?.expandedPrayer || data?.bibleVerseRef || data?.bibleVerseQuote) {
+        const parts = [
+          data.expandedPrayer,
+          [data.bibleVerseRef, data.bibleVerseQuote].filter(Boolean).join(" – "),
+        ].filter(Boolean);
+        const biblePart = parts[1] ? "📖 " + parts[1] : "";
+        const allParts = [parts[0], biblePart].filter(Boolean);
+        if (allParts.length) finalText = text + "\n\n" + allParts.join("\n\n");
       }
       setRefinedContent(finalText);
       setStep(2);

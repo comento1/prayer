@@ -39,18 +39,24 @@ export default function MyPrayers() {
   const handleDelete = async (id: number) => {
     try {
       const res = await fetch(`/api/prayers/${id}`, { method: "DELETE" });
-      if (res.ok) {
+      const ok = res.ok || res.status === 404;
+      if (ok) {
         setPrayers((prev) => prev.filter((p) => p.id !== id));
         setDeletingId(null);
-      } else {
-        const text = await res.text();
-        let msg = "삭제에 실패했습니다.";
-        try {
-          const data = JSON.parse(text);
-          if (data.error) msg = data.error;
-        } catch (_) {}
-        alert(msg);
+        return;
       }
+      const text = await res.text();
+      let msg = "삭제에 실패했습니다.";
+      try {
+        const data = JSON.parse(text);
+        if (data?.success) {
+          setPrayers((prev) => prev.filter((p) => p.id !== id));
+          setDeletingId(null);
+          return;
+        }
+        if (data?.error) msg = data.error;
+      } catch (_) {}
+      alert(msg);
     } catch (err) {
       console.error(err);
       alert("삭제 중 오류가 발생했습니다.");

@@ -268,7 +268,7 @@ function prayersList(payload) {
     }
     var isAnswered = row[7] === 1 || row[7] === '1' ? 1 : 0;
     var answeredNote = row[8] || '';
-    if (groupIdFilter != null && groupIdNum !== groupIdFilter) continue;
+    if (groupIdFilter != null && groupIdNum != null && groupIdNum !== groupIdFilter) continue;
     if (userIdFilter != null && Number(userId) !== userIdFilter) continue;
     prayers.push({
       id: id,

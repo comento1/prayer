@@ -18,6 +18,7 @@ export default function Feed() {
   );
   const [periodFilter, setPeriodFilter] = useState<string>(searchParams.get("period") || "");
   const [nicknameSearch, setNicknameSearch] = useState("");
+  const [prayingId, setPrayingId] = useState<number | null>(null);
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
 
@@ -60,25 +61,60 @@ export default function Feed() {
 
   const handlePray = async (e: MouseEvent, id: number) => {
     e.stopPropagation();
-    const res = await fetch(`/api/prayers/${id}/pray`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
-    const data = await res.json();
-
+    const prayer = prayers.find((p) => p.id === id);
+    if (!prayer) return;
+    const nextPraying = !prayer.user_has_prayed;
+    setPrayingId(id);
     setPrayers((prev) =>
       prev.map((p) => {
-        if (p.id === id) {
-          return {
-            ...p,
-            pray_count: p.pray_count + (data.praying ? 1 : -1),
-            user_has_prayed: !!data.praying,
-          };
-        }
-        return p;
+        if (p.id !== id) return p;
+        return {
+          ...p,
+          pray_count: p.pray_count + (nextPraying ? 1 : -1),
+          user_has_prayed: nextPraying,
+        };
       }),
     );
+    try {
+      const res = await fetch(`/api/prayers/${id}/pray`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const text = await res.text();
+      let data: { praying?: boolean };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = {};
+      }
+      const ok = res.ok && (data.praying === true || data.praying === false);
+      if (!ok) {
+        setPrayers((prev) =>
+          prev.map((p) => {
+            if (p.id !== id) return p;
+            return {
+              ...p,
+              pray_count: prayer.pray_count,
+              user_has_prayed: prayer.user_has_prayed,
+            };
+          }),
+        );
+      }
+    } catch {
+      setPrayers((prev) =>
+        prev.map((p) => {
+          if (p.id !== id) return p;
+          return {
+            ...p,
+            pray_count: prayer.pray_count,
+            user_has_prayed: prayer.user_has_prayed,
+          };
+        }),
+      );
+    } finally {
+      setPrayingId(null);
+    }
   };
 
   return (
@@ -224,7 +260,8 @@ export default function Feed() {
                 <div className="flex space-x-2">
                   <button
                     onClick={(e) => handlePray(e, prayer.id)}
-                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    disabled={prayingId === prayer.id}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-70 ${
                       prayer.user_has_prayed
                         ? "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400"
                         : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700"
@@ -237,7 +274,7 @@ export default function Feed() {
                           : "text-[var(--color-secondary-light)]"
                       }`}
                     />
-                    <span>함께 기도할게요</span>
+                    <span>{prayingId === prayer.id ? "..." : "함께 기도할게요"}</span>
                   </button>
                 </div>
               </div>

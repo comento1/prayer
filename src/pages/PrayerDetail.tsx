@@ -30,6 +30,7 @@ export default function PrayerDetail() {
   const [copied, setCopied] = useState(false);
   const [showAnsweredModal, setShowAnsweredModal] = useState(false);
   const [answeredNote, setAnsweredNote] = useState("");
+  const [prayLoading, setPrayLoading] = useState(false);
 
   useEffect(() => {
     setLoaded(false);
@@ -58,6 +59,13 @@ export default function PrayerDetail() {
   }, [id, user?.id]);
 
   const handlePray = async () => {
+    if (!prayer) return;
+    const next = !isPraying;
+    setPrayLoading(true);
+    setIsPraying(next);
+    setPrayer((prev) =>
+      prev ? { ...prev, pray_count: prev.pray_count + (next ? 1 : -1) } : null,
+    );
     try {
       const res = await fetch(`/api/prayers/${id}/pray`, {
         method: "POST",
@@ -69,15 +77,22 @@ export default function PrayerDetail() {
       try {
         data = JSON.parse(text);
       } catch {
-        return;
+        data = {};
       }
-      setIsPraying(!!data.praying);
+      if (!res.ok || (data.praying !== true && data.praying !== false)) {
+        setIsPraying(prayer.user_has_prayed);
+        setPrayer((prev) =>
+          prev ? { ...prev, pray_count: prayer.pray_count } : null,
+        );
+      }
+    } catch (_) {
+      setIsPraying(prayer.user_has_prayed);
       setPrayer((prev) =>
-        prev
-          ? { ...prev, pray_count: prev.pray_count + (data.praying ? 1 : -1) }
-          : null,
+        prev ? { ...prev, pray_count: prayer.pray_count } : null,
       );
-    } catch (_) {}
+    } finally {
+      setPrayLoading(false);
+    }
   };
 
   const handleComment = async (e: FormEvent) => {
@@ -253,14 +268,15 @@ export default function PrayerDetail() {
         <div className="flex space-x-3">
           <button
             onClick={handlePray}
-            className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center space-x-2 transition-colors ${
+            disabled={prayLoading}
+            className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center space-x-2 transition-colors disabled:opacity-70 ${
               isPraying
                 ? "bg-[var(--color-secondary-light)] text-white"
                 : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
             }`}
           >
             <Heart className={`w-5 h-5 ${isPraying ? "fill-current" : ""}`} />
-            <span>함께 기도할게요</span>
+            <span>{prayLoading ? "..." : "함께 기도할게요"}</span>
           </button>
 
           <button
