@@ -12,9 +12,22 @@ export default function MyPrayers() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!user?.id) {
+      setPrayers([]);
+      return;
+    }
     fetch(`/api/prayers?userId=${user.id}`)
-      .then((res) => res.json())
-      .then(setPrayers);
+      .then(async (res) => {
+        if (!res.ok) return [];
+        const text = await res.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return [];
+        }
+      })
+      .then((data) => setPrayers(Array.isArray(data) ? data : []))
+      .catch(() => setPrayers([]));
   }, [user.id]);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);

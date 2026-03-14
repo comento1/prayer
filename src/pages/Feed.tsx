@@ -28,14 +28,12 @@ export default function Feed() {
       .then((res) => (res.ok ? res.json() : []))
       .then((allGroups: Group[]) => {
         const list = Array.isArray(allGroups) ? allGroups : [];
-        fetch(`/api/users/${user.id}/groups`)
-          .then((res) => {
-            if (res.ok) return res.json();
-            const ids = user.groupIds || [];
-            return list.filter((g) => ids.includes(g.id));
-          })
-          .then((data) => setGroups(Array.isArray(data) ? data : list))
-          .catch(() => setGroups(list));
+        const ids = user.groupIds || [];
+        if (ids.length > 0) {
+          setGroups(list.filter((g) => ids.includes(g.id)));
+        } else {
+          setGroups(list);
+        }
       })
       .catch(() => setGroups([]));
   }, [user.id, user.groupIds]);
@@ -55,8 +53,17 @@ export default function Feed() {
       url += (url.includes("?") ? "&" : "?") + `currentUserId=${user.id}`;
     }
     fetch(url)
-      .then((res) => res.json())
-      .then(setPrayers);
+      .then(async (res) => {
+        if (!res.ok) return [];
+        const text = await res.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return [];
+        }
+      })
+      .then((data) => setPrayers(Array.isArray(data) ? data : []))
+      .catch(() => setPrayers([]));
   }, [activeTab, isAnsweredFilter, periodFilter, user?.id]);
 
   const handlePray = async (e: MouseEvent, id: number) => {
