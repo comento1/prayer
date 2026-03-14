@@ -50,6 +50,10 @@ function doPost(e) {
       const result = prayerPray(payload);
       return createResponse(200, result);
     }
+    if (payload.action === 'prayer_update') {
+      const result = prayerUpdate(payload);
+      return createResponse(200, result);
+    }
     const row = toRow(payload);
     if (row && row.length && payload.action) {
       const sheet = getOrCreateSheet();
@@ -241,6 +245,7 @@ function prayersList(payload) {
   var prayCounts = getPrayCountsByPrayerId();
   var data = sheet.getRange(2, 1, lastRow, 9).getValues();
   var groupIdFilter = payload.groupId != null ? Number(payload.groupId) : null;
+  if (typeof groupIdFilter === 'number' && isNaN(groupIdFilter)) groupIdFilter = null;
   var userIdFilter = payload.userId != null ? Number(payload.userId) : null;
   var periodFilter = payload.period || '';
   var prayers = [];
@@ -253,7 +258,11 @@ function prayersList(payload) {
     var nickname = row[2];
     var groupIdRaw = row[3];
     var groupId = groupIdRaw !== '' && groupIdRaw != null ? groupIdRaw : null;
-    var groupIdNum = groupId != null ? Number(groupId) : null;
+    var groupIdNum = null;
+    if (groupId != null && groupId !== '') {
+      var n = Number(groupId);
+      groupIdNum = isNaN(n) ? null : n;
+    }
     var originalContent = row[5];
     var rawCreated = row[6];
     var createdAt = (typeof rawCreated === 'object' && rawCreated && rawCreated.toISOString)
@@ -268,8 +277,14 @@ function prayersList(payload) {
     }
     var isAnswered = row[7] === 1 || row[7] === '1' ? 1 : 0;
     var answeredNote = row[8] || '';
-    if (groupIdFilter != null && groupIdNum != null && groupIdNum !== groupIdFilter) continue;
-    if (userIdFilter != null && Number(userId) !== userIdFilter) continue;
+    if (groupIdFilter != null) {
+      if (groupIdNum == null) { }
+      else if (groupIdNum !== groupIdFilter) continue;
+    }
+    if (userIdFilter != null) {
+      var rowUserId = (userId != null && userId !== '') ? Number(userId) : NaN;
+      if (isNaN(rowUserId) || rowUserId !== userIdFilter) continue;
+    }
     prayers.push({
       id: id,
       user_id: userId,
@@ -410,4 +425,36 @@ function prayerPray(payload) {
   }
   sheet.appendRow([prayerId, userId, 'PRAYING', '', now]);
   return { praying: true };
+}
+
+function prayerUpdate(payload) {
+  var prayerId = payload.prayerId != null ? Number(payload.prayerId) : NaN;
+  if (isNaN(prayerId)) return { success: false, error: 'prayerId 필요' };
+  var sheet = getOrCreatePrayersSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, error: 'Not found' };
+  var data = sheet.getRange(2, 1, lastRow, 9).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (Number(data[i][0]) === prayerId) {
+      var rowIndex = i + 2;
+      if (payload.isAnswered !== undefined) {
+        var val = payload.isAnswered === true || payload.isAnswered === 1 ? 1 : 0;
+        sheet.getRange(rowIndex, 8).setValue(val);
+        if (val === 1 && payload.answeredNote != null && String(payload.answeredNote).trim() !== '') {
+          var note = String(payload.answeredNote).trim();
+          sheet.getRange(rowIndex, 9).setValue(note);
+          var contentCell = sheet.getRange(rowIndex, 5).getValue();
+          var content = (contentCell != null ? String(contentCell) : '') + '\n\n[응답] ' + note;
+          sheet.getRange(rowIndex, 5).setValue(content);
+        } else if (val === 0) {
+          sheet.getRange(rowIndex, 9).setValue('');
+        }
+      }
+      if (payload.content !== undefined) {
+        sheet.getRange(rowIndex, 5).setValue(String(payload.content));
+      }
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Not found' };
 }
