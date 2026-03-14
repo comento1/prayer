@@ -15,6 +15,7 @@
 const SHEET_NAME = '중보기도_기록';
 const USERS_SHEET_NAME = '사용자';
 const PRAYERS_SHEET_NAME = '기도_목록';
+const INTERACTIONS_SHEET_NAME = '기도_상호작용';
 
 function doPost(e) {
   try {
@@ -35,6 +36,18 @@ function doPost(e) {
     }
     if (payload.action === 'prayers_list') {
       const result = prayersList(payload);
+      return createResponse(200, result);
+    }
+    if (payload.action === 'prayer_get') {
+      const result = prayerGet(payload);
+      return createResponse(200, result);
+    }
+    if (payload.action === 'prayer_delete') {
+      const result = prayerDelete(payload);
+      return createResponse(200, result);
+    }
+    if (payload.action === 'prayer_pray') {
+      const result = prayerPray(payload);
       return createResponse(200, result);
     }
     const row = toRow(payload);
@@ -205,29 +218,57 @@ function prayerCreate(payload) {
   return { id: newId };
 }
 
+function getPrayCountsByPrayerId() {
+  var sheet = getOrCreateInteractionsSheet();
+  var lastRow = sheet.getLastRow();
+  var counts = {};
+  if (lastRow >= 2) {
+    var rows = sheet.getRange(2, 1, lastRow, 3).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][2]) === 'PRAYING') {
+        var pid = Number(rows[i][0]);
+        counts[pid] = (counts[pid] || 0) + 1;
+      }
+    }
+  }
+  return counts;
+}
+
 function prayersList(payload) {
   var sheet = getOrCreatePrayersSheet();
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return { prayers: [] };
+  var prayCounts = getPrayCountsByPrayerId();
   var data = sheet.getRange(2, 1, lastRow, 9).getValues();
   var groupIdFilter = payload.groupId != null ? Number(payload.groupId) : null;
   var userIdFilter = payload.userId != null ? Number(payload.userId) : null;
+  var periodFilter = payload.period || '';
   var prayers = [];
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
+    var content = (row[4] != null && row[4] !== '') ? String(row[4]).trim() : '';
+    if (!content) continue;
     var id = row[0];
     var userId = row[1];
     var nickname = row[2];
-    var groupId = row[3] !== '' ? row[3] : null;
-    var content = row[4];
+    var groupIdRaw = row[3];
+    var groupId = groupIdRaw !== '' && groupIdRaw != null ? groupIdRaw : null;
+    var groupIdNum = groupId != null ? Number(groupId) : null;
     var originalContent = row[5];
     var rawCreated = row[6];
     var createdAt = (typeof rawCreated === 'object' && rawCreated && rawCreated.toISOString)
       ? rawCreated.toISOString()
       : String(rawCreated || '');
+    if (periodFilter === 'week' || periodFilter === 'month') {
+      var createdDate = new Date(createdAt);
+      if (isNaN(createdDate.getTime())) continue;
+      var now = new Date();
+      if (periodFilter === 'week' && (now - createdDate) > 7 * 24 * 60 * 60 * 1000) continue;
+      if (periodFilter === 'month' && (now - createdDate) > 30 * 24 * 60 * 60 * 1000) continue;
+    }
     var isAnswered = row[7] === 1 || row[7] === '1' ? 1 : 0;
     var answeredNote = row[8] || '';
-    if (groupIdFilter != null && groupId !== groupIdFilter) continue;
+    if (groupIdFilter != null && groupIdNum !== groupIdFilter) continue;
     if (userIdFilter != null && Number(userId) !== userIdFilter) continue;
     prayers.push({
       id: id,
@@ -240,11 +281,133 @@ function prayersList(payload) {
       updated_at: createdAt,
       is_answered: isAnswered,
       answered_note: answeredNote,
-      pray_count: 0,
+      pray_count: prayCounts[Number(id)] || 0,
       comment_count: 0,
-      group_name: groupId === 1 ? '창환 조' : groupId === 2 ? '은아 조' : null
+      group_name: groupIdNum === 1 ? '창환 조' : groupIdNum === 2 ? '은아 조' : null
     });
   }
   prayers.reverse();
   return { prayers: prayers };
+}
+
+function getOrCreateInteractionsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(INTERACTIONS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(INTERACTIONS_SHEET_NAME);
+    sheet.appendRow(['prayer_id', 'user_id', 'type', 'content', 'created_at']);
+    sheet.getRange('1:1').setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function prayerGet(payload) {
+  var prayerId = payload.prayerId != null ? Number(payload.prayerId) : NaN;
+  var currentUserId = payload.currentUserId != null ? Number(payload.currentUserId) : null;
+  if (isNaN(prayerId)) return { error: 'prayerId 필요' };
+  var sheet = getOrCreatePrayersSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { error: 'Not found' };
+  var data = sheet.getRange(2, 1, lastRow, 9).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (Number(data[i][0]) === prayerId) {
+      var row = data[i];
+      var rawCreated = row[6];
+      var createdAt = (typeof rawCreated === 'object' && rawCreated && rawCreated.toISOString)
+        ? rawCreated.toISOString() : String(rawCreated || '');
+      var groupId = row[3] !== '' ? row[3] : null;
+      var intSheet = getOrCreateInteractionsSheet();
+      var intRows = intSheet.getLastRow() < 2 ? [] : intSheet.getRange(2, 1, intSheet.getLastRow(), 5).getValues();
+      var prayCount = 0;
+      var userHasPrayed = false;
+      var comments = [];
+      for (var j = 0; j < intRows.length; j++) {
+        if (Number(intRows[j][0]) !== prayerId) continue;
+        var typ = String(intRows[j][2] || '');
+        if (typ === 'PRAYING') {
+          prayCount++;
+          if (currentUserId != null && Number(intRows[j][1]) === currentUserId) userHasPrayed = true;
+        } else if (typ === 'COMMENT') {
+          var commentUserId = intRows[j][1];
+          var commentNick = '';
+          try {
+            var uSheet = getOrCreateUserSheet();
+            if (uSheet.getLastRow() >= commentUserId) {
+              commentNick = String(uSheet.getRange(Number(commentUserId), 1).getValue() || '');
+            }
+          } catch (e) {}
+          comments.push({
+            id: j + 2,
+            prayer_request_id: prayerId,
+            user_id: commentUserId,
+            type: 'COMMENT',
+            content: intRows[j][3] || '',
+            created_at: (intRows[j][4] && intRows[j][4].toISOString) ? intRows[j][4].toISOString() : String(intRows[j][4] || ''),
+            user_nickname: commentNick
+          });
+        }
+      }
+      var prayer = {
+        id: row[0],
+        user_id: row[1],
+        user_nickname: row[2],
+        group_id: groupId,
+        content: row[4],
+        original_content: row[5],
+        created_at: createdAt,
+        updated_at: createdAt,
+        is_answered: row[7] === 1 || row[7] === '1' ? 1 : 0,
+        answered_note: row[8] || '',
+        pray_count: prayCount,
+        comments: comments,
+        user_has_prayed: userHasPrayed,
+        group_name: groupId === 1 ? '창환 조' : groupId === 2 ? '은아 조' : null
+      };
+      return prayer;
+    }
+  }
+  return { error: 'Not found' };
+}
+
+function prayerDelete(payload) {
+  var prayerId = payload.prayerId != null ? Number(payload.prayerId) : NaN;
+  if (isNaN(prayerId)) return { success: false, error: 'prayerId 필요' };
+  var sheet = getOrCreatePrayersSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, error: 'Not found' };
+  var data = sheet.getRange(2, 1, lastRow, 9).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (Number(data[i][0]) === prayerId) {
+      sheet.deleteRow(i + 2);
+      var intSheet = getOrCreateInteractionsSheet();
+      var ir = intSheet.getLastRow();
+      for (var j = ir; j >= 2; j--) {
+        if (Number(intSheet.getRange(j, 1).getValue()) === prayerId) {
+          intSheet.deleteRow(j);
+        }
+      }
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Not found' };
+}
+
+function prayerPray(payload) {
+  var prayerId = payload.prayerId != null ? Number(payload.prayerId) : NaN;
+  var userId = payload.userId != null ? Number(payload.userId) : NaN;
+  if (isNaN(prayerId) || isNaN(userId)) return { error: 'prayerId, userId 필요' };
+  var sheet = getOrCreateInteractionsSheet();
+  var lastRow = sheet.getLastRow();
+  var now = new Date().toISOString();
+  if (lastRow >= 2) {
+    var rows = sheet.getRange(2, 1, lastRow, 5).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (Number(rows[i][0]) === prayerId && Number(rows[i][1]) === userId && String(rows[i][2]) === 'PRAYING') {
+        sheet.deleteRow(i + 2);
+        return { praying: false };
+      }
+    }
+  }
+  sheet.appendRow([prayerId, userId, 'PRAYING', '', now]);
+  return { praying: true };
 }

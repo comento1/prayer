@@ -9,34 +9,24 @@ export default function Feed() {
   const [searchParams] = useSearchParams();
   const initialGroupId = searchParams.get("groupId");
   const isAnsweredFilter = searchParams.get("isAnswered") === "true";
-  const periodFilter = searchParams.get("period");
 
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
+  const [prayersLoading, setPrayersLoading] = useState(true);
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeTab, setActiveTab] = useState<number | "ALL">(
     initialGroupId ? Number(initialGroupId) : "ALL",
   );
+  const [periodFilter, setPeriodFilter] = useState<string>(searchParams.get("period") || "");
+  const [nicknameSearch, setNicknameSearch] = useState("");
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user?.id) {
-      setGroups([]);
-      return;
-    }
     fetch("/api/groups")
       .then((res) => (res.ok ? res.json() : []))
-      .then((allGroups: Group[]) => {
-        const list = Array.isArray(allGroups) ? allGroups : [];
-        const ids = user.groupIds || [];
-        if (ids.length > 0) {
-          setGroups(list.filter((g) => ids.includes(g.id)));
-        } else {
-          setGroups(list);
-        }
-      })
+      .then((list: Group[]) => setGroups(Array.isArray(list) ? list : []))
       .catch(() => setGroups([]));
-  }, [user.id, user.groupIds]);
+  }, []);
 
   useEffect(() => {
     let url =
@@ -46,12 +36,13 @@ export default function Feed() {
     if (isAnsweredFilter) {
       url += (url.includes("?") ? "&" : "?") + "isAnswered=true";
     }
-    if (periodFilter) {
+    if (periodFilter && periodFilter !== "all") {
       url += (url.includes("?") ? "&" : "?") + `period=${periodFilter}`;
     }
     if (user?.id) {
       url += (url.includes("?") ? "&" : "?") + `currentUserId=${user.id}`;
     }
+    setPrayersLoading(true);
     fetch(url)
       .then(async (res) => {
         if (!res.ok) return [];
@@ -63,7 +54,8 @@ export default function Feed() {
         }
       })
       .then((data) => setPrayers(Array.isArray(data) ? data : []))
-      .catch(() => setPrayers([]));
+      .catch(() => setPrayers([]))
+      .finally(() => setPrayersLoading(false));
   }, [activeTab, isAnsweredFilter, periodFilter, user?.id]);
 
   const handlePray = async (e: MouseEvent, id: number) => {
@@ -115,41 +107,75 @@ export default function Feed() {
       </header>
 
       {!isAnsweredFilter && (
-        <div className="px-4 py-3 overflow-x-auto no-scrollbar flex space-x-2">
-          <button
-            onClick={() => setActiveTab("ALL")}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-              activeTab === "ALL"
-                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-            }`}
-          >
-            전체
-          </button>
-          {groups.map((g) => (
+        <>
+          <div className="px-4 py-3 overflow-x-auto no-scrollbar flex space-x-2">
             <button
-              key={g.id}
-              onClick={() => setActiveTab(g.id)}
+              onClick={() => setActiveTab("ALL")}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === g.id
-                  ? "bg-[var(--color-primary-light)] text-white dark:bg-[var(--color-primary-dark)]"
+                activeTab === "ALL"
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
                   : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
               }`}
             >
-              {g.name}
+              전체
             </button>
-          ))}
-        </div>
+            {groups.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => setActiveTab(g.id)}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeTab === g.id
+                    ? "bg-[var(--color-primary-light)] text-white dark:bg-[var(--color-primary-dark)]"
+                    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                }`}
+              >
+                {g.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-4 pb-2 flex flex-wrap items-center gap-2">
+            <select
+              value={periodFilter}
+              onChange={(e) => setPeriodFilter(e.target.value)}
+              className="text-sm px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-0 text-slate-700 dark:text-slate-300"
+            >
+              <option value="">전체 기간</option>
+              <option value="week">최근 7일</option>
+              <option value="month">최근 30일</option>
+            </select>
+            <input
+              type="text"
+              value={nicknameSearch}
+              onChange={(e) => setNicknameSearch(e.target.value)}
+              placeholder="닉네임 검색"
+              className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-0 text-slate-700 dark:text-slate-300 placeholder:text-slate-400"
+            />
+          </div>
+        </>
       )}
 
       <div className="p-4 space-y-4">
-        {prayers.length === 0 ? (
-          <div className="text-center py-12 text-slate-500">
-            <p>아직 나눠진 기도가 없어요.</p>
-            <p>첫 번째로 마음을 꺼내보세요.</p>
-          </div>
-        ) : (
-          prayers.map((prayer) => (
+        {prayersLoading ? (
+          <div className="text-center py-12 text-slate-500">로딩 중...</div>
+        ) : (() => {
+          const searchLower = nicknameSearch.trim().toLowerCase();
+          const filtered = searchLower
+            ? prayers.filter((p) => (p.user_nickname || "").toLowerCase().includes(searchLower))
+            : prayers;
+          return filtered.length === 0 ? (
+            <div className="text-center py-12 text-slate-500">
+              <p>
+                {prayers.length === 0
+                  ? "아직 나눠진 기도가 없어요."
+                  : "검색 결과가 없어요."}
+              </p>
+              <p className="mt-1">
+                {prayers.length === 0 ? "첫 번째로 마음을 꺼내보세요." : "기간·닉네임을 바꿔보세요."}
+              </p>
+            </div>
+          ) : (
+            filtered.map((prayer) => (
             <motion.div
               key={prayer.id}
               initial={{ opacity: 0, y: 10 }}
@@ -216,8 +242,8 @@ export default function Feed() {
                 </div>
               </div>
             </motion.div>
-          ))
-        )}
+            ) ) );
+        })()}
       </div>
     </div>
   );

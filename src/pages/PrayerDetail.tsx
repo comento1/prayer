@@ -20,6 +20,7 @@ export default function PrayerDetail() {
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [prayer, setPrayer] = useState<PrayerRequest | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isPraying, setIsPraying] = useState(false);
@@ -31,29 +32,52 @@ export default function PrayerDetail() {
   const [answeredNote, setAnsweredNote] = useState("");
 
   useEffect(() => {
+    setLoaded(false);
     const url = user?.id ? `/api/prayers/${id}?currentUserId=${user.id}` : `/api/prayers/${id}`;
     fetch(url)
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const text = await res.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return null;
+        }
+      })
       .then((data) => {
-        setPrayer(data);
-        setComments(data.comments || []);
-        setIsPraying(!!data.user_has_prayed);
-      });
+        if (data && !data.error) {
+          setPrayer(data);
+          setComments(data.comments || []);
+          setIsPraying(!!data.user_has_prayed);
+        } else {
+          setPrayer(null);
+        }
+      })
+      .catch(() => setPrayer(null))
+      .finally(() => setLoaded(true));
   }, [id, user?.id]);
 
   const handlePray = async () => {
-    const res = await fetch(`/api/prayers/${id}/pray`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
-    const data = await res.json();
-    setIsPraying(data.praying);
-    setPrayer((prev) =>
-      prev
-        ? { ...prev, pray_count: prev.pray_count + (data.praying ? 1 : -1) }
-        : null,
-    );
+    try {
+      const res = await fetch(`/api/prayers/${id}/pray`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const text = await res.text();
+      let data: { praying?: boolean };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        return;
+      }
+      setIsPraying(!!data.praying);
+      setPrayer((prev) =>
+        prev
+          ? { ...prev, pray_count: prev.pray_count + (data.praying ? 1 : -1) }
+          : null,
+      );
+    } catch (_) {}
   };
 
   const handleComment = async (e: FormEvent) => {
@@ -155,8 +179,20 @@ export default function PrayerDetail() {
 
   if (!prayer)
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        로딩 중...
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        {loaded ? (
+          <>
+            <p className="text-slate-500 dark:text-slate-400 mb-4">기도를 찾을 수 없습니다.</p>
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+            >
+              뒤로
+            </button>
+          </>
+        ) : (
+          <p className="text-slate-500">로딩 중...</p>
+        )}
       </div>
     );
 

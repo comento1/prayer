@@ -32,18 +32,23 @@ export default function CreatePrayer() {
       const response = await generateAIContent({
         model: "gemini-3-flash-preview",
         contents: `사용자가 작성한 기도 제목 초안입니다: "${content}"
-        
-길이나 내용에 따라 적절한 기도 제목 형태로만 다듬어주세요. 질문을 하지 말고, 반드시 다듬어진 기도 제목 문장만 한 개 출력하세요.
-- "하소서", "주시옵소서"와 같이 지나치게 경직되거나 문어체적인 표현은 피하고, 일상에서 친구나 공동체와 나누는 듯한 따뜻하고 자연스러운 구어체 문장으로 정리하세요.
-- 너무 짧으면(단어 수준) 맥락을 살려 조금 더 구체적인 한 문장으로 확장하세요.
-- 길면 핵심을 요약한 한 문장으로 다듬으세요.
-- 적당하면 자연스럽게 다듬으세요.
-- 청년부 공동체에서 나누기 좋은 따뜻하고 정돈된 톤으로 작성하세요.
 
-반드시 JSON 형태로만 응답하세요:
+다음 규칙으로 **청년답게** 기도 제목을 정리해주세요. 질문하지 말고 반드시 JSON만 출력하세요.
+
+[정리 규칙]
+- 말투: "~해줘", "~했으면 좋겠어", "~하면 좋겠다"처럼 20~30대 청년이 친구에게 말하듯 자연스럽고 따뜻한 구어체로.
+- "하소서", "주시옵소서" 같은 격식체·문어체는 쓰지 말 것.
+- 너무 짧으면(단어 수준) 맥락을 살려 한 문장으로 풀어쓰기.
+- 길면 핵심만 남겨 한 문장으로 다듬기.
+- 적당한 길이면 청년답게만 살짝 다듬기.
+- 청년부 공동체에서 나누기 좋은 따뜻하고 정돈된 톤 유지.
+
+[출력 형식 - 반드시 이 JSON만 출력]
 {
   "type": "refined",
-  "text": "다듬어진 기도 제목 한 문장"
+  "text": "다듬어진 기도 제목 한 문장",
+  "expandedPrayer": "작성한 내용을 2~3문장으로 풀어쓴 기도문 (친구에게 말하듯 청년답게)",
+  "bibleVerse": "연관된 성경 구절 한 개 (책 장:절 형식, 예: 빌립보 4:6-7). 없으면 빈 문자열."
 }`,
         config: {
           responseMimeType: "application/json",
@@ -53,7 +58,12 @@ export default function CreatePrayer() {
       const raw = response.text || "{}";
       const data = typeof raw === "string" ? JSON.parse(raw) : raw;
       const text = data?.text ?? content;
-      setRefinedContent(text);
+      let finalText = text;
+      if (data?.expandedPrayer || data?.bibleVerse) {
+        const parts = [data.expandedPrayer, data.bibleVerse ? "📖 " + data.bibleVerse : ""].filter(Boolean);
+        if (parts.length) finalText = text + "\n\n" + parts.join("\n\n");
+      }
+      setRefinedContent(finalText);
       setStep(2);
     } catch (err: any) {
       console.error("AI Refinement Error:", err);

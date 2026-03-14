@@ -16,6 +16,7 @@ export default async function handler(req: any, res: any) {
   if (req.method === "GET") {
     const groupId = req.query?.groupId;
     const userId = req.query?.userId;
+    const period = req.query?.period;
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -24,6 +25,7 @@ export default async function handler(req: any, res: any) {
           action: "prayers_list",
           groupId: groupId || undefined,
           userId: userId || undefined,
+          period: period || undefined,
         }),
       });
       const text = await response.text();

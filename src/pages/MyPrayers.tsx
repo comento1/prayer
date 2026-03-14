@@ -7,6 +7,7 @@ import { PrayerRequest, User } from "../types";
 
 export default function MyPrayers() {
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
+  const [prayersLoading, setPrayersLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"ACTIVE" | "ANSWERED">("ACTIVE");
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
@@ -14,8 +15,10 @@ export default function MyPrayers() {
   useEffect(() => {
     if (!user?.id) {
       setPrayers([]);
+      setPrayersLoading(false);
       return;
     }
+    setPrayersLoading(true);
     fetch(`/api/prayers?userId=${user.id}`)
       .then(async (res) => {
         if (!res.ok) return [];
@@ -27,7 +30,8 @@ export default function MyPrayers() {
         }
       })
       .then((data) => setPrayers(Array.isArray(data) ? data : []))
-      .catch(() => setPrayers([]));
+      .catch(() => setPrayers([]))
+      .finally(() => setPrayersLoading(false));
   }, [user.id]);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -39,12 +43,19 @@ export default function MyPrayers() {
         setPrayers((prev) => prev.filter((p) => p.id !== id));
         setDeletingId(null);
       } else {
-        const data = await res.json();
-        alert(`삭제에 실패했습니다: ${data.error || "알 수 없는 오류"}`);
+        const text = await res.text();
+        let msg = "삭제에 실패했습니다.";
+        try {
+          const data = JSON.parse(text);
+          if (data.error) msg = data.error;
+        } catch (_) {}
+        alert(msg);
       }
     } catch (err) {
       console.error(err);
       alert("삭제 중 오류가 발생했습니다.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -100,7 +111,9 @@ export default function MyPrayers() {
         </div>
 
         <div className="space-y-4">
-          {displayPrayers.length === 0 ? (
+          {prayersLoading ? (
+            <div className="text-center py-12 text-slate-500">로딩 중...</div>
+          ) : displayPrayers.length === 0 ? (
             <div className="text-center py-12 text-slate-500">
               <p>해당하는 기도 제목이 없습니다.</p>
             </div>
