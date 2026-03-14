@@ -17,14 +17,10 @@ export default function Search() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user?.id) {
-      fetch(`/api/users/${user.id}/groups`)
-        .then((res) => (res.ok ? res.json() : []))
-        .then((data) => setGroups(Array.isArray(data) ? data : []))
-        .catch(() => setGroups([]));
-    } else {
-      setGroups([]);
-    }
+    fetch("/api/groups")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setGroups(Array.isArray(data) ? data : []))
+      .catch(() => setGroups([]));
 
     // Fetch users in same groups (simplified for MVP: just fetch all users)
     // In a real app, this should be filtered by group
@@ -32,7 +28,7 @@ export default function Search() {
       .then((res) => res.json())
       .then(setUsers)
       .catch(() => setUsers([])); // Ignore if endpoint doesn't exist yet
-  }, [user.id]);
+  }, []);
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">

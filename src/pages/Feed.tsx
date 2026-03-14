@@ -1,10 +1,9 @@
 import { useEffect, useState, MouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { motion } from "framer-motion";
-import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
 import { Feather, Heart, Sparkles, ArrowLeft } from "lucide-react";
 import { Group, PrayerRequest, User } from "../types";
+import { formatPrayerDate } from "../utils/date";
 
 export default function Feed() {
   const [searchParams] = useSearchParams();
@@ -25,11 +24,21 @@ export default function Feed() {
       setGroups([]);
       return;
     }
-    fetch(`/api/users/${user.id}/groups`)
+    fetch("/api/groups")
       .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setGroups(Array.isArray(data) ? data : []))
+      .then((allGroups: Group[]) => {
+        const list = Array.isArray(allGroups) ? allGroups : [];
+        fetch(`/api/users/${user.id}/groups`)
+          .then((res) => {
+            if (res.ok) return res.json();
+            const ids = user.groupIds || [];
+            return list.filter((g) => ids.includes(g.id));
+          })
+          .then((data) => setGroups(Array.isArray(data) ? data : list))
+          .catch(() => setGroups(list));
+      })
       .catch(() => setGroups([]));
-  }, [user.id]);
+  }, [user.id, user.groupIds]);
 
   useEffect(() => {
     let url =
@@ -159,10 +168,7 @@ export default function Feed() {
                   </span>
                 </div>
                 <span className="text-xs text-slate-400">
-                  {formatDistanceToNow(new Date(prayer.created_at), {
-                    addSuffix: true,
-                    locale: ko,
-                  })}
+                  {formatPrayerDate(prayer.created_at)}
                 </span>
               </div>
 

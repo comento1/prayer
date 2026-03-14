@@ -221,7 +221,10 @@ function prayersList(payload) {
     var groupId = row[3] !== '' ? row[3] : null;
     var content = row[4];
     var originalContent = row[5];
-    var createdAt = row[6];
+    var rawCreated = row[6];
+    var createdAt = (typeof rawCreated === 'object' && rawCreated && rawCreated.toISOString)
+      ? rawCreated.toISOString()
+      : String(rawCreated || '');
     var isAnswered = row[7] === 1 || row[7] === '1' ? 1 : 0;
     var answeredNote = row[8] || '';
     if (groupIdFilter != null && groupId !== groupIdFilter) continue;

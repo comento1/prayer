@@ -18,18 +18,11 @@ export default function CreatePrayer() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user?.id) {
-      setGroups([]);
-      return;
-    }
-    fetch(`/api/users/${user.id}/groups`)
-      .then((res) => {
-        if (!res.ok) return [];
-        return res.json();
-      })
+    fetch("/api/groups")
+      .then((res) => (res.ok ? res.json() : []))
       .then((data) => setGroups(Array.isArray(data) ? data : []))
       .catch(() => setGroups([]));
-  }, [user.id]);
+  }, []);
 
   const handleRefine = async () => {
     if (!content.trim()) return;

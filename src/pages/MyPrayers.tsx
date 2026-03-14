@@ -1,9 +1,8 @@
 import { useEffect, useState, MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
 import { Sparkles, Heart, Trash2, Users } from "lucide-react";
+import { formatPrayerDate } from "../utils/date";
 import { PrayerRequest, User } from "../types";
 
 export default function MyPrayers() {
@@ -131,10 +130,7 @@ export default function MyPrayers() {
 
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs text-slate-400">
-                    {formatDistanceToNow(new Date(prayer.created_at), {
-                      addSuffix: true,
-                      locale: ko,
-                    })}
+                    {formatPrayerDate(prayer.created_at)}
                   </span>
                   <button
                     onClick={(e) => {

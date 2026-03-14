@@ -1,9 +1,8 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useParams, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
 import { generateAIContent } from "../services/aiService";
+import { formatPrayerDate } from "../utils/date";
 import {
   ArrowLeft,
   Heart,
@@ -197,10 +196,7 @@ export default function PrayerDetail() {
                 </div>
                 <div className="text-xs text-slate-500">
                   {prayer.group_name || "전체 공개"} ·{" "}
-                  {formatDistanceToNow(new Date(prayer.created_at), {
-                    addSuffix: true,
-                    locale: ko,
-                  })}
+                  {formatPrayerDate(prayer.created_at)}
                 </div>
               </div>
             </div>
@@ -273,10 +269,7 @@ export default function PrayerDetail() {
                     {comment.user_nickname}
                   </span>
                   <span className="text-xs text-slate-400">
-                    {formatDistanceToNow(new Date(comment.created_at), {
-                      addSuffix: true,
-                      locale: ko,
-                    })}
+                    {formatPrayerDate(comment.created_at)}
                   </span>
                 </div>
                 <p className="text-slate-700 dark:text-slate-300 text-sm">
