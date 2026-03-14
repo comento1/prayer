@@ -1,8 +1,9 @@
 export interface User {
   id: number;
   nickname: string;
-  pin: string;
-  created_at: string;
+  pin?: string;
+  created_at?: string;
+  groupIds?: number[];
 }
 
 export interface Group {

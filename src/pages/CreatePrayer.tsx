@@ -79,6 +79,7 @@ export default function CreatePrayer() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
+          nickname: user.nickname || "",
           groupId: groupId || null,
           content: finalContent,
           originalContent: content,

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Sparkles, Heart, Trash2 } from "lucide-react";
+import { Sparkles, Heart, Trash2, Users } from "lucide-react";
 import { PrayerRequest, User } from "../types";
 
 export default function MyPrayers() {
@@ -43,8 +43,15 @@ export default function MyPrayers() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen">
-      <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3">
+      <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
         <h1 className="font-serif font-medium text-lg">내 기도</h1>
+        <button
+          onClick={() => navigate("/groups?from=my")}
+          className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-sm"
+        >
+          <Users className="w-4 h-4" />
+          조 설정
+        </button>
       </header>
 
       <div className="p-6">
