@@ -32,9 +32,17 @@ export default function PrayerDetail() {
   const [answeredNote, setAnsweredNote] = useState("");
   const [prayLoading, setPrayLoading] = useState(false);
 
+  const prayerId = id != null ? String(id).trim() : "";
+  const prayerIdNum = prayerId !== "" ? Number(prayerId) : NaN;
+
   useEffect(() => {
+    if (prayerId === "" || isNaN(prayerIdNum)) {
+      setLoaded(true);
+      setPrayer(null);
+      return;
+    }
     setLoaded(false);
-    const url = user?.id ? `/api/prayers/${id}?currentUserId=${user.id}` : `/api/prayers/${id}`;
+    const url = user?.id ? `/api/prayers/${prayerIdNum}?currentUserId=${user.id}` : `/api/prayers/${prayerIdNum}`;
     fetch(url)
       .then(async (res) => {
         if (!res.ok) return null;
@@ -56,10 +64,10 @@ export default function PrayerDetail() {
       })
       .catch(() => setPrayer(null))
       .finally(() => setLoaded(true));
-  }, [id, user?.id]);
+  }, [prayerId, prayerIdNum, user?.id]);
 
   const handlePray = async () => {
-    if (!prayer) return;
+    if (!prayer || isNaN(prayerIdNum)) return;
     const next = !isPraying;
     setPrayLoading(true);
     setIsPraying(next);
@@ -67,7 +75,7 @@ export default function PrayerDetail() {
       prev ? { ...prev, pray_count: prev.pray_count + (next ? 1 : -1) } : null,
     );
     try {
-      const res = await fetch(`/api/prayers/${id}/pray`, {
+      const res = await fetch(`/api/prayers/${prayerIdNum}/pray`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id }),
@@ -98,10 +106,10 @@ export default function PrayerDetail() {
   const handleComment = async (e: FormEvent) => {
     e.preventDefault();
     const text = newComment.trim();
-    if (!text) return;
+    if (!text || isNaN(prayerIdNum)) return;
 
     try {
-      const res = await fetch(`/api/prayers/${id}/comments`, {
+      const res = await fetch(`/api/prayers/${prayerIdNum}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id, content: text }),
@@ -111,7 +119,7 @@ export default function PrayerDetail() {
           ...prev,
           {
             id: Date.now(),
-            prayer_request_id: Number(id),
+            prayer_request_id: prayerIdNum,
             user_id: user.id,
             type: "COMMENT",
             content: text,
@@ -170,10 +178,10 @@ export default function PrayerDetail() {
   };
 
   const handleAnsweredSubmit = async (note?: string) => {
-    if (!prayer || prayer.user_id !== user.id) return;
+    if (!prayer || prayer.user_id !== user.id || isNaN(prayerIdNum)) return;
 
     if (prayer.is_answered === 1) {
-      await fetch(`/api/prayers/${id}`, {
+      await fetch(`/api/prayers/${prayerIdNum}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isAnswered: false }),
@@ -184,7 +192,7 @@ export default function PrayerDetail() {
     }
 
     setShowAnsweredModal(false);
-    await fetch(`/api/prayers/${id}`, {
+    await fetch(`/api/prayers/${prayerIdNum}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isAnswered: true, answeredNote: note != null ? note.trim() : "" }),
@@ -214,7 +222,7 @@ export default function PrayerDetail() {
     );
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+    <div className="max-w-md mx-auto min-h-screen bg-slate-50 dark:bg-slate-900 pb-40">
       <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-4 py-3 flex items-center border-b border-slate-100 dark:border-slate-800">
         <button
           onClick={() => navigate(-1)}
@@ -312,7 +320,7 @@ export default function PrayerDetail() {
             <span className="font-medium text-sm">격려 메시지</span>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 min-h-[80px]">
             {comments.map((comment) => (
               <div
                 key={comment.id}
@@ -335,7 +343,8 @@ export default function PrayerDetail() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-4 pb-safe">
+      <div className="fixed left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-4 pb-safe bottom-16 z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)]">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">격려 메시지나 성경 구절을 남겨주세요</p>
         <form
           onSubmit={handleComment}
           className="max-w-md mx-auto flex space-x-2"
@@ -344,13 +353,13 @@ export default function PrayerDetail() {
             type="text"
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="격려 메시지나 성경 구절을 남겨주세요..."
-            className="flex-1 px-4 py-3 rounded-full bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-[var(--color-primary-light)] outline-none text-sm"
+            placeholder="메시지 입력..."
+            className="flex-1 px-4 py-3 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-[var(--color-primary-light)] outline-none text-sm"
           />
           <button
             type="submit"
             disabled={!newComment.trim()}
-            className="w-12 h-12 rounded-full bg-[var(--color-primary-light)] text-white flex items-center justify-center disabled:opacity-50"
+            className="w-12 h-12 rounded-full bg-[var(--color-primary-light)] text-white flex items-center justify-center disabled:opacity-50 shrink-0"
           >
             <ArrowLeft className="w-5 h-5 rotate-180" />
           </button>

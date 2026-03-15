@@ -216,7 +216,7 @@ export default function Feed() {
               key={prayer.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              onClick={() => navigate(`/prayers/${prayer.id}`)}
+              onClick={() => navigate(`/prayers/${Number(prayer.id)}`)}
               className="prayer-card cursor-pointer"
             >
               {prayer.is_answered === 1 && (

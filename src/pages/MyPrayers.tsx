@@ -29,7 +29,18 @@ export default function MyPrayers() {
           return [];
         }
       })
-      .then((data) => setPrayers(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data?.prayers && Array.isArray(data.prayers) ? data.prayers : []);
+        const normalized = list
+          .filter((p: PrayerRequest) => p != null && Number(p.id) > 0)
+          .map((p: PrayerRequest) => ({ ...p, is_answered: Number(p.is_answered) === 1 ? 1 : 0 }));
+        const byId = new Map<number, PrayerRequest>();
+        normalized.forEach((p: PrayerRequest) => {
+          const id = Number(p.id);
+          if (!byId.has(id)) byId.set(id, p);
+        });
+        setPrayers(Array.from(byId.values()));
+      })
       .catch(() => setPrayers([]))
       .finally(() => setPrayersLoading(false));
   }, [user.id]);
@@ -65,8 +76,8 @@ export default function MyPrayers() {
     }
   };
 
-  const activePrayers = prayers.filter((p) => Number(p.is_answered) === 0);
-  const answeredPrayers = prayers.filter((p) => Number(p.is_answered) === 1);
+  const activePrayers = prayers.filter((p) => p != null && Number(p.is_answered) !== 1);
+  const answeredPrayers = prayers.filter((p) => p != null && Number(p.is_answered) === 1);
   const displayPrayers =
     activeTab === "ACTIVE" ? activePrayers : answeredPrayers;
 
@@ -129,7 +140,7 @@ export default function MyPrayers() {
                 key={prayer.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                onClick={() => navigate(`/prayers/${prayer.id}`)}
+                onClick={() => navigate(`/prayers/${Number(prayer.id)}`)}
                 className="prayer-card cursor-pointer relative overflow-hidden"
               >
                 <AnimatePresence>

@@ -242,6 +242,34 @@ function getPrayCountsByPrayerId() {
   return counts;
 }
 
+/**
+ * 조설정(선택한 조)에서 해당 groupId를 선택한 사용자 ID 목록 반환.
+ * 사용자 시트 4번째 컬럼 "선택한 조"에 "1" 또는 "1,2" 형태로 저장됨.
+ */
+function getUserIdsByGroupId(groupId) {
+  var g = Number(groupId);
+  if (isNaN(g)) return [];
+  var sheet = getOrCreateUserSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  var data = sheet.getRange(2, 1, lastRow, 4).getValues();
+  var userIds = [];
+  for (var i = 0; i < data.length; i++) {
+    var rowUserId = i + 2;
+    var groupIdsStr = (data[i][3] != null && data[i][3] !== '') ? String(data[i][3]).trim() : '';
+    if (!groupIdsStr) continue;
+    var parts = groupIdsStr.split(',');
+    for (var j = 0; j < parts.length; j++) {
+      var n = parseInt(parts[j], 10);
+      if (!isNaN(n) && n === g) {
+        userIds.push(rowUserId);
+        break;
+      }
+    }
+  }
+  return userIds;
+}
+
 function prayersList(payload) {
   var sheet = getOrCreatePrayersSheet();
   var lastRow = sheet.getLastRow();
@@ -282,12 +310,19 @@ function prayersList(payload) {
     var isAnswered = Number(row[7]) === 1 ? 1 : 0;
     var answeredNote = row[8] || '';
     if (groupIdFilter != null) {
-      if (groupIdNum !== groupIdFilter) continue;
+      var rowUserIdNum = (userId !== '' && userId != null) ? Number(userId) : NaN;
+      var userIdsInGroup = getUserIdsByGroupId(groupIdFilter);
+      var prayerBelongsToGroup = (groupIdNum === groupIdFilter);
+      var userSelectedThisGroup = (rowUserIdNum && userIdsInGroup.indexOf(rowUserIdNum) >= 0);
+      if (!prayerBelongsToGroup && !userSelectedThisGroup) continue;
     }
     if (userIdFilter != null) {
       var rowUserId = (userId != null && userId !== '') ? Number(userId) : NaN;
       if (isNaN(rowUserId) || rowUserId !== userIdFilter) continue;
     }
+    var displayGroupName = groupIdNum === 1 ? '창환 조' : groupIdNum === 2 ? '은아 조' : null;
+    if (displayGroupName == null && groupIdFilter === 1) displayGroupName = '창환 조';
+    if (displayGroupName == null && groupIdFilter === 2) displayGroupName = '은아 조';
     prayers.push({
       id: Number(id),
       user_id: userId,
@@ -301,7 +336,7 @@ function prayersList(payload) {
       answered_note: answeredNote,
       pray_count: prayCounts[Number(id)] || 0,
       comment_count: 0,
-      group_name: groupIdNum === 1 ? '창환 조' : groupIdNum === 2 ? '은아 조' : null
+      group_name: displayGroupName
     });
   }
   prayers.reverse();
