@@ -54,6 +54,10 @@ function doPost(e) {
       const result = prayerUpdate(payload);
       return createResponse(200, result);
     }
+    if (payload.action === 'prayer_comment') {
+      const result = prayerComment(payload);
+      return createResponse(200, result);
+    }
     const row = toRow(payload);
     if (row && row.length && payload.action) {
       const sheet = getOrCreateSheet();
@@ -275,18 +279,17 @@ function prayersList(payload) {
       if (periodFilter === 'week' && (now - createdDate) > 7 * 24 * 60 * 60 * 1000) continue;
       if (periodFilter === 'month' && (now - createdDate) > 30 * 24 * 60 * 60 * 1000) continue;
     }
-    var isAnswered = row[7] === 1 || row[7] === '1' ? 1 : 0;
+    var isAnswered = Number(row[7]) === 1 ? 1 : 0;
     var answeredNote = row[8] || '';
     if (groupIdFilter != null) {
-      if (groupIdNum == null) { }
-      else if (groupIdNum !== groupIdFilter) continue;
+      if (groupIdNum !== groupIdFilter) continue;
     }
     if (userIdFilter != null) {
       var rowUserId = (userId != null && userId !== '') ? Number(userId) : NaN;
       if (isNaN(rowUserId) || rowUserId !== userIdFilter) continue;
     }
     prayers.push({
-      id: id,
+      id: Number(id),
       user_id: userId,
       user_nickname: nickname,
       group_id: groupId,
@@ -363,7 +366,7 @@ function prayerGet(payload) {
         }
       }
       var prayer = {
-        id: row[0],
+        id: Number(row[0]),
         user_id: row[1],
         user_nickname: row[2],
         group_id: groupId,
@@ -371,12 +374,12 @@ function prayerGet(payload) {
         original_content: row[5],
         created_at: createdAt,
         updated_at: createdAt,
-        is_answered: row[7] === 1 || row[7] === '1' ? 1 : 0,
+        is_answered: Number(row[7]) === 1 ? 1 : 0,
         answered_note: row[8] || '',
         pray_count: prayCount,
         comments: comments,
         user_has_prayed: userHasPrayed,
-        group_name: groupId === 1 ? '창환 조' : groupId === 2 ? '은아 조' : null
+        group_name: Number(groupId) === 1 ? '창환 조' : Number(groupId) === 2 ? '은아 조' : null
       };
       return prayer;
     }
@@ -405,6 +408,18 @@ function prayerDelete(payload) {
     }
   }
   return { success: false, error: 'Not found' };
+}
+
+function prayerComment(payload) {
+  var prayerId = payload.prayerId != null ? Number(payload.prayerId) : NaN;
+  var userId = payload.userId != null ? Number(payload.userId) : NaN;
+  var content = (payload.content != null ? String(payload.content) : '').trim();
+  if (isNaN(prayerId) || isNaN(userId) || !content) return { error: 'prayerId, userId, content 필요' };
+  var sheet = getOrCreateInteractionsSheet();
+  var now = new Date().toISOString();
+  sheet.appendRow([prayerId, userId, 'COMMENT', content, now]);
+  var newId = sheet.getLastRow();
+  return { id: newId };
 }
 
 function prayerPray(payload) {

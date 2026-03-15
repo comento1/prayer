@@ -97,29 +97,31 @@ export default function PrayerDetail() {
 
   const handleComment = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
+    const text = newComment.trim();
+    if (!text) return;
 
-    const res = await fetch(`/api/prayers/${id}/comments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, content: newComment }),
-    });
-
-    if (res.ok) {
-      setComments([
-        ...comments,
-        {
-          id: Date.now(),
-          prayer_request_id: Number(id),
-          user_id: user.id,
-          type: "COMMENT",
-          content: newComment,
-          created_at: new Date().toISOString(),
-          user_nickname: user.nickname,
-        },
-      ]);
-      setNewComment("");
-    }
+    try {
+      const res = await fetch(`/api/prayers/${id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, content: text }),
+      });
+      if (res.ok) {
+        setComments((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            prayer_request_id: Number(id),
+            user_id: user.id,
+            type: "COMMENT",
+            content: text,
+            created_at: new Date().toISOString(),
+            user_nickname: user.nickname || "",
+          },
+        ]);
+        setNewComment("");
+      }
+    } catch (_) {}
   };
 
   const handleGeneratePrayer = async () => {

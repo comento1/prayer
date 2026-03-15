@@ -65,8 +65,8 @@ export default function MyPrayers() {
     }
   };
 
-  const activePrayers = prayers.filter((p) => p.is_answered === 0);
-  const answeredPrayers = prayers.filter((p) => p.is_answered === 1);
+  const activePrayers = prayers.filter((p) => Number(p.is_answered) === 0);
+  const answeredPrayers = prayers.filter((p) => Number(p.is_answered) === 1);
   const displayPrayers =
     activeTab === "ACTIVE" ? activePrayers : answeredPrayers;
 
