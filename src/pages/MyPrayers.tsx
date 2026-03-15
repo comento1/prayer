@@ -1,40 +1,39 @@
 import { useEffect, useState, MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Heart, Trash2, Users } from "lucide-react";
+import { Sparkles, Heart, Trash2, Users, RefreshCw } from "lucide-react";
 import { formatPrayerDate } from "../utils/date";
 import { PrayerRequest, User } from "../types";
-import { getCached, setCached } from "../utils/cache";
+import { getCached, setCached, invalidateUrl } from "../utils/cache";
 
 export default function MyPrayers() {
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
   const [prayersLoading, setPrayersLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"ACTIVE" | "ANSWERED">("ACTIVE");
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
 
   const myPrayersUrl = user?.id ? `/api/prayers?userId=${user.id}` : "";
 
-  useEffect(() => {
-    if (!user?.id) {
-      setPrayers([]);
-      setPrayersLoading(false);
-      return;
-    }
-    const cached = getCached<PrayerRequest[]>(myPrayersUrl);
-    const normalize = (data: PrayerRequest[] | unknown) => {
-      const list = Array.isArray(data) ? data : (data && typeof data === "object" && "prayers" in data && Array.isArray((data as { prayers: PrayerRequest[] }).prayers) ? (data as { prayers: PrayerRequest[] }).prayers : []);
-      const normalized = list
-        .filter((p: PrayerRequest) => p != null && Number(p.id) > 0)
-        .map((p: PrayerRequest) => ({ ...p, is_answered: Number(p.is_answered) === 1 ? 1 : 0 }));
-      const byId = new Map<number, PrayerRequest>();
-      normalized.forEach((p: PrayerRequest) => {
-        const id = Number(p.id);
-        if (!byId.has(id)) byId.set(id, p);
-      });
-      return Array.from(byId.values());
-    };
-    if (Array.isArray(cached)) {
+  const normalize = (data: PrayerRequest[] | unknown): PrayerRequest[] => {
+    const list = Array.isArray(data) ? data : (data && typeof data === "object" && "prayers" in data && Array.isArray((data as { prayers: PrayerRequest[] }).prayers) ? (data as { prayers: PrayerRequest[] }).prayers : []);
+    const normalized = list
+      .filter((p: PrayerRequest) => p != null && Number(p.id) > 0)
+      .map((p: PrayerRequest) => ({ ...p, is_answered: Number(p.is_answered) === 1 ? 1 : 0 }));
+    const byId = new Map<number, PrayerRequest>();
+    normalized.forEach((p: PrayerRequest) => {
+      const id = Number(p.id);
+      if (!byId.has(id)) byId.set(id, p);
+    });
+    return Array.from(byId.values());
+  };
+
+  const loadMyPrayers = (forceRefresh: boolean) => {
+    if (!user?.id) return;
+    if (forceRefresh) invalidateUrl(myPrayersUrl);
+    const cached = forceRefresh ? null : getCached<PrayerRequest[]>(myPrayersUrl);
+    if (!forceRefresh && Array.isArray(cached)) {
       setPrayers(normalize(cached));
       setPrayersLoading(false);
     } else {
@@ -56,8 +55,26 @@ export default function MyPrayers() {
         setPrayers(list);
       })
       .catch(() => setPrayers((prev) => (Array.isArray(cached) ? prev : [])))
-      .finally(() => setPrayersLoading(false));
+      .finally(() => {
+        setPrayersLoading(false);
+        setRefreshing(false);
+      });
+  };
+
+  useEffect(() => {
+    if (!user?.id) {
+      setPrayers([]);
+      setPrayersLoading(false);
+      return;
+    }
+    loadMyPrayers(false);
   }, [user.id]);
+
+  const handleRefresh = () => {
+    if (!user?.id) return;
+    setRefreshing(true);
+    loadMyPrayers(true);
+  };
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -99,13 +116,24 @@ export default function MyPrayers() {
     <div className="max-w-md mx-auto min-h-screen">
       <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
         <h1 className="font-serif font-medium text-lg">내 기도</h1>
-        <button
-          onClick={() => navigate("/groups?from=my")}
-          className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-sm"
-        >
-          <Users className="w-4 h-4" />
-          조 설정
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing || prayersLoading}
+            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+            title="새로고침"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={() => navigate("/groups?from=my")}
+            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-sm"
+          >
+            <Users className="w-4 h-4" />
+            조 설정
+          </button>
+        </div>
       </header>
 
       <div className="p-6">

@@ -13,6 +13,7 @@ export default function CreatePrayer() {
   const [isRefining, setIsRefining] = useState(false);
   const [refinedContent, setRefinedContent] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
@@ -80,7 +81,9 @@ export default function CreatePrayer() {
   };
 
   const handleSubmit = async (finalContent: string) => {
+    if (isSubmitting) return;
     setSubmitError(null);
+    setIsSubmitting(true);
     try {
       const res = await fetch("/api/prayers", {
         method: "POST",
@@ -103,9 +106,13 @@ export default function CreatePrayer() {
         }
       }
       await res.json();
+      const { invalidatePrayersCache } = await import("../utils/cache");
+      invalidatePrayersCache();
       navigate("/feed");
     } catch (err: any) {
       setSubmitError(err?.message || "기도 등록에 실패했습니다.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -191,10 +198,10 @@ export default function CreatePrayer() {
             )}
             <button
               onClick={() => handleSubmit(content)}
-              disabled={!content.trim() || isRefining}
+              disabled={!content.trim() || isRefining || isSubmitting}
               className="w-full py-4 rounded-xl bg-transparent text-slate-500 font-medium disabled:opacity-50"
             >
-              그냥 이대로 등록할게요
+              {isSubmitting ? "등록 중..." : "그냥 이대로 등록할게요"}
             </button>
           </motion.div>
         )}
@@ -230,14 +237,16 @@ export default function CreatePrayer() {
             <div className="space-y-3">
               <button
                 onClick={() => handleSubmit(refinedContent)}
-                className="w-full py-4 rounded-xl bg-[var(--color-primary-light)] dark:bg-[var(--color-primary-dark)] text-white font-medium flex items-center justify-center space-x-2"
+                disabled={isSubmitting}
+                className="w-full py-4 rounded-xl bg-[var(--color-primary-light)] dark:bg-[var(--color-primary-dark)] text-white font-medium flex items-center justify-center space-x-2 disabled:opacity-50"
               >
                 <Send className="w-5 h-5" />
-                <span>이대로 등록하기 →</span>
+                <span>{isSubmitting ? "등록 중..." : "이대로 등록하기 →"}</span>
               </button>
               <button
                 onClick={() => handleSubmit(content)}
-                className="w-full py-3 rounded-xl text-slate-500 font-medium text-sm"
+                disabled={isSubmitting}
+                className="w-full py-3 rounded-xl text-slate-500 font-medium text-sm disabled:opacity-50"
               >
                 내가 쓴 원본으로 등록할게요
               </button>

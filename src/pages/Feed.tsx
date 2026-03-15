@@ -1,10 +1,10 @@
-import { useEffect, useState, MouseEvent } from "react";
+import { useEffect, useState, useCallback, MouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { motion } from "framer-motion";
-import { Feather, Heart, Sparkles, ArrowLeft } from "lucide-react";
+import { Feather, Heart, Sparkles, ArrowLeft, RefreshCw } from "lucide-react";
 import { Group, PrayerRequest, User } from "../types";
 import { formatPrayerDate } from "../utils/date";
-import { getCached, setCached } from "../utils/cache";
+import { getCached, setCached, invalidateUrl } from "../utils/cache";
 
 export default function Feed() {
   const [searchParams] = useSearchParams();
@@ -20,8 +20,52 @@ export default function Feed() {
   const [periodFilter, setPeriodFilter] = useState<string>(searchParams.get("period") || "");
   const [nicknameSearch, setNicknameSearch] = useState("");
   const [prayingId, setPrayingId] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
+
+  const feedUrl =
+    activeTab === "ALL"
+      ? "/api/prayers"
+      : `/api/prayers?groupId=${activeTab}` +
+        (isAnsweredFilter ? "&isAnswered=true" : "") +
+        (periodFilter && periodFilter !== "all" ? `&period=${periodFilter}` : "") +
+        (user?.id ? `&currentUserId=${user.id}` : "");
+
+  const loadPrayers = useCallback(
+    (forceRefresh: boolean) => {
+      const url = feedUrl;
+      if (forceRefresh) invalidateUrl(url);
+      const cached = forceRefresh ? null : getCached<PrayerRequest[]>(url);
+      if (!forceRefresh && Array.isArray(cached)) {
+        setPrayers(cached);
+        setPrayersLoading(false);
+      } else {
+        setPrayersLoading(true);
+      }
+      fetch(url)
+        .then(async (res) => {
+          if (!res.ok) return [];
+          const text = await res.text();
+          try {
+            return JSON.parse(text);
+          } catch {
+            return [];
+          }
+        })
+        .then((data) => {
+          const list = Array.isArray(data) ? data : [];
+          setCached(url, list);
+          setPrayers(list);
+        })
+        .catch(() => setPrayers((prev) => (Array.isArray(cached) ? prev : [])))
+        .finally(() => {
+          setPrayersLoading(false);
+          setRefreshing(false);
+        });
+    },
+    [feedUrl],
+  );
 
   useEffect(() => {
     fetch("/api/groups")
@@ -31,44 +75,13 @@ export default function Feed() {
   }, []);
 
   useEffect(() => {
-    let url =
-      activeTab === "ALL"
-        ? "/api/prayers"
-        : `/api/prayers?groupId=${activeTab}`;
-    if (isAnsweredFilter) {
-      url += (url.includes("?") ? "&" : "?") + "isAnswered=true";
-    }
-    if (periodFilter && periodFilter !== "all") {
-      url += (url.includes("?") ? "&" : "?") + `period=${periodFilter}`;
-    }
-    if (user?.id) {
-      url += (url.includes("?") ? "&" : "?") + `currentUserId=${user.id}`;
-    }
-    const cached = getCached<PrayerRequest[]>(url);
-    if (Array.isArray(cached) && cached.length >= 0) {
-      setPrayers(cached);
-      setPrayersLoading(false);
-    } else {
-      setPrayersLoading(true);
-    }
-    fetch(url)
-      .then(async (res) => {
-        if (!res.ok) return [];
-        const text = await res.text();
-        try {
-          return JSON.parse(text);
-        } catch {
-          return [];
-        }
-      })
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
-        setCached(url, list);
-        setPrayers(list);
-      })
-      .catch(() => setPrayers((prev) => (cached ? prev : [])))
-      .finally(() => setPrayersLoading(false));
-  }, [activeTab, isAnsweredFilter, periodFilter, user?.id]);
+    loadPrayers(false);
+  }, [loadPrayers]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadPrayers(true);
+  };
 
   const handlePray = async (e: MouseEvent, id: number) => {
     e.stopPropagation();
@@ -148,8 +161,19 @@ export default function Feed() {
               : "서정은혜교회 청년부 기도방"}
           </span>
         </div>
-        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm font-medium">
-          {user.nickname?.[0]}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing || prayersLoading}
+            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+            title="새로고침"
+          >
+            <RefreshCw className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm font-medium">
+            {user.nickname?.[0]}
+          </div>
         </div>
       </header>
 
