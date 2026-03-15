@@ -19,7 +19,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   if (!user) return <Navigate to="/" replace />;
 
   return (
-    <div className="pb-20 min-h-screen">
+    <div className="pb-20 min-h-screen bg-[var(--color-bg-light)] dark:bg-[var(--color-bg-dark)]">
       {children}
       <BottomNav />
     </div>

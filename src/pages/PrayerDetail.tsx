@@ -108,28 +108,30 @@ export default function PrayerDetail() {
     const text = newComment.trim();
     if (!text || isNaN(prayerIdNum)) return;
 
+    const optimisticComment = {
+      id: Date.now(),
+      prayer_request_id: prayerIdNum,
+      user_id: user.id,
+      type: "COMMENT" as const,
+      content: text,
+      created_at: new Date().toISOString(),
+      user_nickname: user.nickname || "",
+    };
+    setComments((prev) => [...prev, optimisticComment]);
+    setNewComment("");
+
     try {
       const res = await fetch(`/api/prayers/${prayerIdNum}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id, content: text }),
       });
-      if (res.ok) {
-        setComments((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            prayer_request_id: prayerIdNum,
-            user_id: user.id,
-            type: "COMMENT",
-            content: text,
-            created_at: new Date().toISOString(),
-            user_nickname: user.nickname || "",
-          },
-        ]);
-        setNewComment("");
+      if (!res.ok) {
+        setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
       }
-    } catch (_) {}
+    } catch (_) {
+      setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+    }
   };
 
   const handleGeneratePrayer = async () => {
@@ -222,7 +224,7 @@ export default function PrayerDetail() {
     );
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-slate-50 dark:bg-slate-900 pb-40">
+    <div className="max-w-md mx-auto min-h-screen bg-[var(--color-bg-light)] dark:bg-[var(--color-bg-dark)] pb-40">
       <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-4 py-3 flex items-center border-b border-slate-100 dark:border-slate-800">
         <button
           onClick={() => navigate(-1)}

@@ -280,6 +280,7 @@ function prayersList(payload) {
   if (typeof groupIdFilter === 'number' && isNaN(groupIdFilter)) groupIdFilter = null;
   var userIdFilter = payload.userId != null ? Number(payload.userId) : null;
   var periodFilter = payload.period || '';
+  var userIdsInGroup = (groupIdFilter != null) ? getUserIdsByGroupId(groupIdFilter) : [];
   var prayers = [];
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
@@ -311,7 +312,6 @@ function prayersList(payload) {
     var answeredNote = row[8] || '';
     if (groupIdFilter != null) {
       var rowUserIdNum = (userId !== '' && userId != null) ? Number(userId) : NaN;
-      var userIdsInGroup = getUserIdsByGroupId(groupIdFilter);
       var prayerBelongsToGroup = (groupIdNum === groupIdFilter);
       var userSelectedThisGroup = (rowUserIdNum && userIdsInGroup.indexOf(rowUserIdNum) >= 0);
       if (!prayerBelongsToGroup && !userSelectedThisGroup) continue;

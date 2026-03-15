@@ -31,7 +31,7 @@ export default function Search() {
   }, []);
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+    <div className="max-w-md mx-auto min-h-screen bg-[var(--color-bg-light)] dark:bg-[var(--color-bg-dark)] pb-24">
       <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-4 py-3 flex items-center border-b border-slate-100 dark:border-slate-800">
         <span className="font-medium ml-2">조회</span>
       </header>

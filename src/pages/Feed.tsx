@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Feather, Heart, Sparkles, ArrowLeft } from "lucide-react";
 import { Group, PrayerRequest, User } from "../types";
 import { formatPrayerDate } from "../utils/date";
+import { getCached, setCached } from "../utils/cache";
 
 export default function Feed() {
   const [searchParams] = useSearchParams();
@@ -43,7 +44,13 @@ export default function Feed() {
     if (user?.id) {
       url += (url.includes("?") ? "&" : "?") + `currentUserId=${user.id}`;
     }
-    setPrayersLoading(true);
+    const cached = getCached<PrayerRequest[]>(url);
+    if (Array.isArray(cached) && cached.length >= 0) {
+      setPrayers(cached);
+      setPrayersLoading(false);
+    } else {
+      setPrayersLoading(true);
+    }
     fetch(url)
       .then(async (res) => {
         if (!res.ok) return [];
@@ -54,8 +61,12 @@ export default function Feed() {
           return [];
         }
       })
-      .then((data) => setPrayers(Array.isArray(data) ? data : []))
-      .catch(() => setPrayers([]))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setCached(url, list);
+        setPrayers(list);
+      })
+      .catch(() => setPrayers((prev) => (cached ? prev : [])))
       .finally(() => setPrayersLoading(false));
   }, [activeTab, isAnsweredFilter, periodFilter, user?.id]);
 
@@ -192,8 +203,21 @@ export default function Feed() {
       )}
 
       <div className="p-4 space-y-4">
-        {prayersLoading ? (
-          <div className="text-center py-12 text-slate-500">로딩 중...</div>
+        {prayersLoading && prayers.length === 0 ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="prayer-card animate-pulse">
+                <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded mb-4" />
+                <div className="flex justify-between mb-3">
+                  <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded" />
+                  <div className="h-3 w-16 bg-slate-100 dark:bg-slate-600 rounded" />
+                </div>
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded mb-2" />
+                <div className="h-4 w-3/4 bg-slate-100 dark:bg-slate-600 rounded mb-4" />
+                <div className="h-4 w-28 bg-slate-100 dark:bg-slate-600 rounded pt-3 border-t border-slate-100 dark:border-slate-700" />
+              </div>
+            ))}
+          </>
         ) : (() => {
           const searchLower = nicknameSearch.trim().toLowerCase();
           const filtered = searchLower

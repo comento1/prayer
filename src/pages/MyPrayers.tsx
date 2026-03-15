@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Heart, Trash2, Users } from "lucide-react";
 import { formatPrayerDate } from "../utils/date";
 import { PrayerRequest, User } from "../types";
+import { getCached, setCached } from "../utils/cache";
 
 export default function MyPrayers() {
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
@@ -12,14 +13,34 @@ export default function MyPrayers() {
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
 
+  const myPrayersUrl = user?.id ? `/api/prayers?userId=${user.id}` : "";
+
   useEffect(() => {
     if (!user?.id) {
       setPrayers([]);
       setPrayersLoading(false);
       return;
     }
-    setPrayersLoading(true);
-    fetch(`/api/prayers?userId=${user.id}`)
+    const cached = getCached<PrayerRequest[]>(myPrayersUrl);
+    const normalize = (data: PrayerRequest[] | unknown) => {
+      const list = Array.isArray(data) ? data : (data && typeof data === "object" && "prayers" in data && Array.isArray((data as { prayers: PrayerRequest[] }).prayers) ? (data as { prayers: PrayerRequest[] }).prayers : []);
+      const normalized = list
+        .filter((p: PrayerRequest) => p != null && Number(p.id) > 0)
+        .map((p: PrayerRequest) => ({ ...p, is_answered: Number(p.is_answered) === 1 ? 1 : 0 }));
+      const byId = new Map<number, PrayerRequest>();
+      normalized.forEach((p: PrayerRequest) => {
+        const id = Number(p.id);
+        if (!byId.has(id)) byId.set(id, p);
+      });
+      return Array.from(byId.values());
+    };
+    if (Array.isArray(cached)) {
+      setPrayers(normalize(cached));
+      setPrayersLoading(false);
+    } else {
+      setPrayersLoading(true);
+    }
+    fetch(myPrayersUrl)
       .then(async (res) => {
         if (!res.ok) return [];
         const text = await res.text();
@@ -30,18 +51,11 @@ export default function MyPrayers() {
         }
       })
       .then((data) => {
-        const list = Array.isArray(data) ? data : (data?.prayers && Array.isArray(data.prayers) ? data.prayers : []);
-        const normalized = list
-          .filter((p: PrayerRequest) => p != null && Number(p.id) > 0)
-          .map((p: PrayerRequest) => ({ ...p, is_answered: Number(p.is_answered) === 1 ? 1 : 0 }));
-        const byId = new Map<number, PrayerRequest>();
-        normalized.forEach((p: PrayerRequest) => {
-          const id = Number(p.id);
-          if (!byId.has(id)) byId.set(id, p);
-        });
-        setPrayers(Array.from(byId.values()));
+        const list = normalize(data);
+        setCached(myPrayersUrl, list);
+        setPrayers(list);
       })
-      .catch(() => setPrayers([]))
+      .catch(() => setPrayers((prev) => (Array.isArray(cached) ? prev : [])))
       .finally(() => setPrayersLoading(false));
   }, [user.id]);
 
@@ -128,8 +142,20 @@ export default function MyPrayers() {
         </div>
 
         <div className="space-y-4">
-          {prayersLoading ? (
-            <div className="text-center py-12 text-slate-500">로딩 중...</div>
+          {prayersLoading && prayers.length === 0 ? (
+            <>
+              {[1, 2].map((i) => (
+                <div key={i} className="prayer-card animate-pulse">
+                  <div className="flex justify-between mb-3">
+                    <div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded" />
+                    <div className="h-8 w-8 bg-slate-100 dark:bg-slate-600 rounded" />
+                  </div>
+                  <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded mb-2" />
+                  <div className="h-4 max-w-[66%] bg-slate-100 dark:bg-slate-600 rounded mb-4" />
+                  <div className="h-4 w-36 bg-slate-100 dark:bg-slate-600 rounded" />
+                </div>
+              ))}
+            </>
           ) : displayPrayers.length === 0 ? (
             <div className="text-center py-12 text-slate-500">
               <p>해당하는 기도 제목이 없습니다.</p>
